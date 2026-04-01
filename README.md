@@ -1,14 +1,42 @@
 # billetera-flutter
 
-Paquete Flutter que abre **billetera-widget** en un **WebView**. Envía `dni`, `género`, `correo`, `celular` y `tenant` como query en la ruta `/home` (mismo contrato que el widget Angular).
+Paquete Flutter que abre **billetera-widget** en un **WebView**. Los datos de persona (`dni`, `género`, `correo`, `celular`, `tenant`) se envían como query en la ruta `/home`, igual que si el usuario abriera una URL en el navegador.
+
+**Requisitos:** Dart `>=3.2.0`, Flutter `>=3.16.0`.
 
 ---
 
-## Implementación paso a paso (para desarrolladores)
+## Resumen rápido
 
-### Paso 1 — Agregar la dependencia
+1. Agregá la dependencia `git` en `pubspec.yaml` → `flutter pub get`.
+2. En **Android**, permití tráfico HTTP si usás `http://` local (ver [Android](#android-manifest)).
+3. En **iOS**, configurá ATS para red local si usás `http://` (ver [iOS](#ios-infoplist)).
+4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo origen del sitio** (sin `/home` ni `?query`).
 
-En el `pubspec.yaml` de tu aplicación:
+```dart
+import 'package:billetera_flutter/billetera_flutter.dart';
+
+await BilleteraWidget.open(
+  context,
+  config: BilleteraWidgetConfig(
+    baseUrl: 'https://widget.tu-dominio.com',
+    debugLogging: true,
+  ),
+  params: BilleteraLaunchParams(
+    dni: '12345678',
+    genero: BilleteraGenero.masculino,
+    correo: 'usuario@correo.com',
+    celular: '1122334455',
+    tenant: 'tu-tenant',
+  ),
+);
+```
+
+---
+
+## 1. Instalar el paquete
+
+### `pubspec.yaml`
 
 ```yaml
 dependencies:
@@ -21,36 +49,67 @@ dependencies:
       ref: main
 ```
 
-- **Versión estable:** cambiá `ref` por un **tag** (ej. `v0.1.0`) o un **commit** concreto.
-- **Repo privado:** usá la URL SSH, por ejemplo `git@github.com:Aginco-lending-online/billetera-flutter.git`, y tené configurada tu clave o credenciales en el entorno.
+- **Fijar versión:** usá un **tag** (`ref: v0.1.0`) o el **SHA** de un commit en lugar de `main`.
+- **Repo privado (SSH):**
 
-### Paso 2 — Descargar dependencias
+```yaml
+  billetera_flutter:
+    git:
+      url: git@github.com:Aginco-lending-online/billetera-flutter.git
+      ref: main
+```
+
+### Comandos
 
 ```bash
 flutter pub get
 ```
 
-### Paso 3 — Permitir HTTP en desarrollo (solo si usás `http://` local)
+Verificá que se resolvió:
 
-El paquete acepta **`http://`** y **`https://`**. En **producción** usá siempre **HTTPS**.
+```bash
+flutter pub deps | grep billetera_flutter
+```
 
-#### Android
+### Errores al hacer `pub get`
 
-Si cargás el widget con `http://` (ej. `http://10.0.2.2:4200`), Android 9+ puede bloquear cleartext.
+| Síntoma | Qué revisar |
+|--------|-------------|
+| `Repository not found` | Acceso al repo (¿privado?). Probá SSH o `gh auth login` / credenciales HTTPS. |
+| `Permission denied (publickey)` | Clave SSH cargada en el agente y agregada en GitHub. |
+| Timeout / red | VPN, proxy o firewall bloqueando `github.com`. |
 
-En `android/app/src/main/AndroidManifest.xml`, dentro de `<application …>`:
+---
+
+## 2. Plataforma: HTTP local (`http://`)
+
+En **producción** el widget debería servirse por **HTTPS**; así evitás excepciones en Android/iOS.
+
+Si en desarrollo usás `http://127.0.0.1:4200`, `http://10.0.2.2:4200`, etc.:
+
+### Android (`AndroidManifest.xml`)
+
+Dentro de `<manifest>` (permiso de red):
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+```
+
+Dentro de `<application …>`:
 
 ```xml
 <application
     android:usesCleartextTraffic="true"
-    … >
+    …>
 ```
 
-Restringilo a **debug** si podés (build flavors / manifest por variante). En **release** hacia internet, preferí HTTPS y podés omitir esto.
+Sin `usesCleartextTraffic` (o política de red que bloquee HTTP), el WebView puede mostrar errores tipo **cleartext not permitted** / página en blanco.
 
-#### iOS
+**Tip:** En release, si solo usás HTTPS, podés quitar `usesCleartextTraffic` o limitarlo a un flavor de debug.
 
-Para `http://` en simulador o dispositivo, en `ios/Runner/Info.plist` podés añadir (solo mientras desarrollás):
+### iOS (`Info.plist`)
+
+Para cargar `http://` hacia tu Mac o LAN en desarrollo:
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -60,91 +119,176 @@ Para `http://` en simulador o dispositivo, en `ios/Runner/Info.plist` podés añ
 </dict>
 ```
 
-O excepciones por dominio/IP según la [documentación de Apple](https://developer.apple.com/documentation/bundleresources/information_property_list/nsapptransportsecurity). En **App Store** conviene servir el widget por **HTTPS**.
+Más opciones en la [documentación de Apple sobre ATS](https://developer.apple.com/documentation/bundleresources/information_property_list/nsapptransportsecurity).
 
-### Paso 4 — Llamar al paquete desde tu UI
+---
+
+## 3. Cómo armar `baseUrl` (muy importante)
+
+El paquete **no** recibe la URL completa del navegador con `/home?dni=…`. Recibe el **origen del despliegue del widget** y arma internamente:
+
+`{baseUrl normalizado}/home?dni=…&genero=…&correo=…&celular=…&tenant=…`
+
+### Ejemplo
+
+Si en el navegador abrís:
+
+```text
+http://localhost:4200/home?dni=12345678&genero=M&correo=a@b.com&celular=…&tenant=…
+```
+
+En Flutter pasá **solo**:
 
 ```dart
-import 'package:billetera_flutter/billetera_flutter.dart';
+baseUrl: 'http://localhost:4200'
+```
 
-Future<void> abrirWidget(BuildContext context) async {
-  await BilleteraWidget.open(
-    context,
-    config: BilleteraWidgetConfig(
-      baseUrl: 'https://widget.tu-dominio.com',
-      debugLogging: true, // opcional: imprime la URL en consola
-    ),
-    params: BilleteraLaunchParams(
-      dni: '12345678',
-      genero: BilleteraGenero.masculino, // o 'M' / 'F' / 'O'
-      correo: 'usuario@correo.com',
-      celular: '1122334455',
-      tenant: 'tu-tenant',
-    ),
-  );
+Los datos van en `BilleteraLaunchParams`, no en la URL manual.
+
+### Qué incluye `baseUrl`
+
+| Incluir | Ejemplo |
+|--------|---------|
+| Esquema `http` o `https` | `https://widget.ejemplo.com` |
+| Host y puerto si aplica | `http://10.0.2.2:4200` |
+| Subpath si el widget vive bajo carpeta | `https://cdn.ejemplo.com/mi-app` → se abre `…/mi-app/home?…` |
+
+### Qué no mezclar en `baseUrl`
+
+| Evitar | Motivo |
+|--------|--------|
+| `/home` al final | El paquete ya agrega `home` (configurable con `homePath`). |
+| `?dni=…&…` | Los query los arma el paquete desde `BilleteraLaunchParams`. |
+| Barra final | Se normaliza; mejor sin barra para claridad. |
+
+Si copiás una URL larga por error, el paquete **ignora** query y fragment del string base y solo usa host, puerto y path (no mezcla esos query con los del formulario).
+
+### Esquema opcional
+
+Si escribís solo host y puerto, se asume **HTTP**:
+
+- `10.0.2.2:4200` → `http://10.0.2.2:4200`
+- `localhost:4200` → `http://localhost:4200`
+
+### Tabla por entorno
+
+| Dónde corre la app | `baseUrl` típica para `ng serve` en tu PC |
+|--------------------|-------------------------------------------|
+| Emulador Android | `http://10.0.2.2:4200` |
+| Simulador iOS / macOS / mismo host | `http://127.0.0.1:4200` o `http://localhost:4200` |
+| Dispositivo físico (misma WiFi) | `http://IP_DE_TU_PC:4200` |
+| Producción | `https://tu-dominio-del-widget.com` |
+
+**Angular:** para que el emulador Android llegue al dev server:
+
+```bash
+ng serve --host 0.0.0.0 --port 4200
+```
+
+---
+
+## 4. Validación y mensajes de error
+
+### URL (`validateBilleteraBaseUrl` / pantalla del paquete)
+
+| Problema | Mensaje aproximado |
+|----------|-------------------|
+| Cadena vacía | `La URL base no puede estar vacía` |
+| Sin host válido | `URL base inválida: se necesita un host (ej. http://127.0.0.1:4200…)` |
+| Esquema que no sea http/https (`ftp://`, etc.) | `Solo se admite http o https (recibido: …)` |
+
+### Parámetros (`BilleteraLaunchParams.validate()`)
+
+| Problema | Mensaje |
+|----------|---------|
+| DNI | `DNI debe tener entre 7 y 8 dígitos` |
+| Género no reconocido | Depende del valor; usá `M`/`F`/`O` o `BilleteraGenero` |
+| Correo | `Correo electrónico no válido` |
+| Celular | `Celular no válido (mínimo 8 dígitos en total)` |
+| Tenant vacío | `Tenant no puede estar vacío` |
+
+### Validar antes de abrir (tu app)
+
+```dart
+final config = BilleteraWidgetConfig(baseUrl: url);
+final params = BilleteraLaunchParams(/* … */);
+
+final urlErr = validateBilleteraBaseUrl(config.baseUrl);
+final paramErr = params.validate();
+if (urlErr != null || paramErr != null) {
+  // SnackBar, diálogo, etc.
+  return;
 }
+
+await BilleteraWidget.open(context, config: config, params: params);
 ```
 
-Si los datos o la URL base son inválidos, la pantalla del paquete muestra el error en lugar de cargar el WebView.
+Con `debugLogging: true` en `BilleteraWidgetConfig`, en consola verás la línea:
 
-### Paso 5 — Elegir bien `baseUrl` (por entorno)
+`[billetera_flutter] WebView URL: …` — útil para comparar con lo que abrís en Chrome.
 
-`baseUrl` es el **origen del sitio del widget** (esquema + host + puerto opcional + path opcional), **sin barra final**.
+---
 
-| Situación | Ejemplo de `baseUrl` |
-|-----------|----------------------|
-| Emulador Android + `ng serve` en la PC | `http://10.0.2.2:4200` |
-| Simulador iOS / app en el mismo host que el dev server | `http://127.0.0.1:4200` |
-| Dispositivo físico en la misma WiFi | `http://192.168.x.x:4200` (IP de tu máquina) |
-| Staging / producción | `https://widget.tu-dominio.com` |
-| Widget bajo subcarpeta | `https://cdn.ejemplo.com/mi-app` → la pantalla carga `…/mi-app/home?…` |
+## 5. Errores en el WebView (página no carga)
 
-**Comodidades del paquete**
+La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. Causas frecuentes:
 
-- Podés escribir **`localhost:4200`** o **`10.0.2.2:4200`** sin `http://`: se asume **HTTP**.
-- **`HTTPS://…`** en mayúsculas se normaliza bien.
-- Query o fragment en el string de base (errores de copy-paste) **no** se mezclan con los parámetros del widget; solo se usa host, puerto y path.
+| Síntoma | Acción |
+|---------|--------|
+| `ERR_CONNECTION_REFUSED` | El servidor Angular no está levantado o el puerto es otro. |
+| `ERR_ADDRESS_UNREACHABLE` / timeout | En emulador Android no uses `localhost` para el host; usá `10.0.2.2`. |
+| Página en blanco / cleartext (Android) | `usesCleartextTraffic` + `INTERNET` en el manifest. |
+| ATS (iOS) bloqueando HTTP | `NSAllowsLocalNetworking` o servir por HTTPS. |
+| Certificado HTTPS inválido (staging) | Ajustar red / certificados; en dev preferí HTTP local. |
 
-**Validación previa (opcional)**
+---
+
+## 6. API adicional
+
+| API | Uso |
+|-----|-----|
+| `BilleteraWidget.open` | Abre la ruta con `Navigator.push`. |
+| `BilleteraWebViewScreen` | Misma UI en tu propio `Navigator`. |
+| `buildBilleteraWidgetUri` | Obtener el `Uri` final (tests, logs). |
+| `parseWidgetBaseUri` | Normalizar solo la base. |
+| `homePath` en `BilleteraWidgetConfig` | Si la ruta no es `home` (por defecto `home`). |
+
+---
+
+## 7. Variables por entorno (`--dart-define`)
+
+Podés inyectar la URL en tiempo de compilación y leerla con `String.fromEnvironment`:
+
+```bash
+flutter run --dart-define=WIDGET_BASE_URL=https://staging-widget.ejemplo.com
+```
 
 ```dart
-final urlError = validateBilleteraBaseUrl(miBaseUrl);
-final paramsError = misParams.validate();
+const base = String.fromEnvironment('WIDGET_BASE_URL', defaultValue: 'https://prod-widget.ejemplo.com');
 ```
 
-### Paso 6 — API alternativa (más control)
+Para builds:
 
-- **`BilleteraWebViewScreen`**: misma pantalla que usa `BilleteraWidget.open`, por si querés envolverla en tu propio `Navigator`.
-- **`buildBilleteraWidgetUri`**: obtiene el `Uri` final (tests, deep links, depuración).
-- **`parseWidgetBaseUri`**: normaliza solo la base.
+```bash
+flutter build apk --dart-define=WIDGET_BASE_URL=https://…
+```
 
 ---
 
-## Parámetros de persona
+## 8. App de ejemplo
 
-| Campo | Reglas |
-|-------|--------|
-| `dni` | 7 u 8 dígitos (se ignoran caracteres no numéricos al armar el query) |
-| `genero` | `BilleteraGenero`, letra `M` / `F` / `O`, o texto tipo Masculino / Femenino / Otro |
-| `correo` | Formato email simple |
-| `celular` | Al menos 8 dígitos en total |
-| `tenant` | No vacío |
+Si tu equipo mantiene un proyecto demo aparte, usalo como referencia de `pubspec.yaml`, manifest iOS/Android y validación previa. La URL del repo depende de tu organización en GitHub.
 
 ---
 
-## Desarrollo de este paquete (contribuidores)
-
-Ejemplo dentro del repo:
+## 9. Desarrollo del paquete (contribuidores)
 
 ```bash
-cd example
-flutter run --dart-define=WIDGET_BASE_URL=http://127.0.0.1:4200
-```
-
-Tests:
-
-```bash
+git clone https://github.com/Aginco-lending-online/billetera-flutter.git
+cd billetera-flutter
+flutter pub get
 flutter test
+cd example && flutter run --dart-define=WIDGET_BASE_URL=http://127.0.0.1:4200
 ```
 
 ---
