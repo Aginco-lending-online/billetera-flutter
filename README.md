@@ -1,6 +1,11 @@
 # billetera-flutter
 
-Paquete Flutter que abre **billetera-widget** en un **WebView**. Los datos de persona (`dni`, `género`, `correo`, `celular`, `tenant`) se envían como query en la ruta `/home`, igual que si el usuario abriera una URL en el navegador.
+Paquete Flutter para **embeber el flujo de billetera en un WebView**. Tu app solo necesita:
+
+- La **URL base** que te dé tu equipo (staging, producción o entorno local).
+- Los datos de persona: `dni`, `género`, `correo`, `celular`, `tenant`.
+
+El paquete construye la petición a la ruta `/home` con esos datos en el query string (equivalente a abrir una URL en el navegador).
 
 **Requisitos:** Dart `>=3.2.0`, Flutter `>=3.16.0`.
 
@@ -11,7 +16,7 @@ Paquete Flutter que abre **billetera-widget** en un **WebView**. Los datos de pe
 1. Agregá la dependencia `git` en `pubspec.yaml` → `flutter pub get`.
 2. En **Android**, permití tráfico HTTP si usás `http://` local (ver [Android](#android-manifest)).
 3. En **iOS**, configurá ATS para red local si usás `http://` (ver [iOS](#ios-infoplist)).
-4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo origen del sitio** (sin `/home` ni `?query`).
+4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo el origen** que te indiquen (sin `/home` ni `?query`).
 
 ```dart
 import 'package:billetera_flutter/billetera_flutter.dart';
@@ -19,7 +24,7 @@ import 'package:billetera_flutter/billetera_flutter.dart';
 await BilleteraWidget.open(
   context,
   config: BilleteraWidgetConfig(
-    baseUrl: 'https://widget.tu-dominio.com',
+    baseUrl: 'https://billetera.tu-dominio.com',
     debugLogging: true,
   ),
   params: BilleteraLaunchParams(
@@ -83,7 +88,7 @@ flutter pub deps | grep billetera_flutter
 
 ## 2. Plataforma: HTTP local (`http://`)
 
-En **producción** el widget debería servirse por **HTTPS**; así evitás excepciones en Android/iOS.
+En **producción** la URL base debería ser **HTTPS**; así evitás bloqueos en Android/iOS.
 
 Si en desarrollo usás `http://127.0.0.1:4200`, `http://10.0.2.2:4200`, etc.:
 
@@ -125,13 +130,13 @@ Más opciones en la [documentación de Apple sobre ATS](https://developer.apple.
 
 ## 3. Cómo armar `baseUrl` (muy importante)
 
-El paquete **no** recibe la URL completa del navegador con `/home?dni=…`. Recibe el **origen del despliegue del widget** y arma internamente:
+El paquete **no** recibe la URL completa del navegador con `/home?dni=…`. Recibe el **origen** (protocolo + host + puerto opcional + path opcional de despliegue) y arma internamente:
 
 `{baseUrl normalizado}/home?dni=…&genero=…&correo=…&celular=…&tenant=…`
 
 ### Ejemplo
 
-Si en el navegador abrís:
+Si te pasan o copiás del navegador algo como:
 
 ```text
 http://localhost:4200/home?dni=12345678&genero=M&correo=a@b.com&celular=…&tenant=…
@@ -149,19 +154,19 @@ Los datos van en `BilleteraLaunchParams`, no en la URL manual.
 
 | Incluir | Ejemplo |
 |--------|---------|
-| Esquema `http` o `https` | `https://widget.ejemplo.com` |
+| Esquema `http` o `https` | `https://billetera.ejemplo.com` |
 | Host y puerto si aplica | `http://10.0.2.2:4200` |
-| Subpath si el widget vive bajo carpeta | `https://cdn.ejemplo.com/mi-app` → se abre `…/mi-app/home?…` |
+| Subpath si el despliegue está bajo una carpeta | `https://cdn.ejemplo.com/mi-app` → se abre `…/mi-app/home?…` |
 
 ### Qué no mezclar en `baseUrl`
 
 | Evitar | Motivo |
 |--------|--------|
-| `/home` al final | El paquete ya agrega `home` (configurable con `homePath`). |
+| `/home` al final | El paquete ya agrega el segmento `home` (configurable con `homePath`). |
 | `?dni=…&…` | Los query los arma el paquete desde `BilleteraLaunchParams`. |
 | Barra final | Se normaliza; mejor sin barra para claridad. |
 
-Si copiás una URL larga por error, el paquete **ignora** query y fragment del string base y solo usa host, puerto y path (no mezcla esos query con los del formulario).
+Si pegás una URL larga por error, el paquete **ignora** query y fragment del string base y solo usa host, puerto y path (no mezcla esos query con los del flujo).
 
 ### Esquema opcional
 
@@ -172,18 +177,16 @@ Si escribís solo host y puerto, se asume **HTTP**:
 
 ### Tabla por entorno
 
-| Dónde corre la app | `baseUrl` típica para `ng serve` en tu PC |
-|--------------------|-------------------------------------------|
-| Emulador Android | `http://10.0.2.2:4200` |
-| Simulador iOS / macOS / mismo host | `http://127.0.0.1:4200` o `http://localhost:4200` |
-| Dispositivo físico (misma WiFi) | `http://IP_DE_TU_PC:4200` |
-| Producción | `https://tu-dominio-del-widget.com` |
+Pedí a tu equipo la URL exacta para cada entorno. Referencias habituales cuando el servidor corre en **tu PC** y la app en un dispositivo:
 
-**Angular:** para que el emulador Android llegue al dev server:
+| Dónde corre la app | `baseUrl` típica hacia tu máquina |
+|--------------------|-----------------------------------|
+| Emulador Android | `http://10.0.2.2:PUERTO` (`10.0.2.2` es el alias del host desde el emulador) |
+| Simulador iOS / macOS / mismo host | `http://127.0.0.1:PUERTO` o `http://localhost:PUERTO` |
+| Dispositivo físico (misma WiFi) | `http://IP_DE_TU_PC:PUERTO` |
+| Staging / producción | La HTTPS que te asignen (ej. `https://billetera.midominio.com`) |
 
-```bash
-ng serve --host 0.0.0.0 --port 4200
-```
+**Emulador Android y servidor solo en `127.0.0.1`:** desde el emulador no sirve usar `http://localhost:4200` para llegar a tu PC; usá `10.0.2.2`. Además, el proceso que escucha en tu máquina debe aceptar conexiones **desde la red del emulador** (no solo loopback). Si no carga, pedí a tu equipo que el servidor de desarrollo escuche en **todas las interfaces** (`0.0.0.0`) o que te den la URL correcta para ese entorno.
 
 ---
 
@@ -223,9 +226,9 @@ if (urlErr != null || paramErr != null) {
 await BilleteraWidget.open(context, config: config, params: params);
 ```
 
-Con `debugLogging: true` en `BilleteraWidgetConfig`, en consola verás la línea:
+Con `debugLogging: true` en `BilleteraWidgetConfig`, en consola verás:
 
-`[billetera_flutter] WebView URL: …` — útil para comparar con lo que abrís en Chrome.
+`[billetera_flutter] WebView URL: …` — útil para comparar con lo que abrís en el navegador.
 
 ---
 
@@ -235,11 +238,11 @@ La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. C
 
 | Síntoma | Acción |
 |---------|--------|
-| `ERR_CONNECTION_REFUSED` | El servidor Angular no está levantado o el puerto es otro. |
-| `ERR_ADDRESS_UNREACHABLE` / timeout | En emulador Android no uses `localhost` para el host; usá `10.0.2.2`. |
+| `ERR_CONNECTION_REFUSED` | Nada escucha en host:puerto, puerto incorrecto, o el servidor solo acepta loopback cuando la app usa otra dirección. |
+| `ERR_ADDRESS_UNREACHABLE` / timeout | En emulador Android no uses `localhost` para referirte a tu PC; usá `10.0.2.2` (y el puerto acordado). |
 | Página en blanco / cleartext (Android) | `usesCleartextTraffic` + `INTERNET` en el manifest. |
-| ATS (iOS) bloqueando HTTP | `NSAllowsLocalNetworking` o servir por HTTPS. |
-| Certificado HTTPS inválido (staging) | Ajustar red / certificados; en dev preferí HTTP local. |
+| ATS (iOS) bloqueando HTTP | `NSAllowsLocalNetworking` o HTTPS. |
+| Certificado HTTPS inválido (staging) | Coordinar con tu equipo (certificados / entorno). |
 
 ---
 
@@ -247,37 +250,40 @@ La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. C
 
 | API | Uso |
 |-----|-----|
-| `BilleteraWidget.open` | Abre la ruta con `Navigator.push`. |
-| `BilleteraWebViewScreen` | Misma UI en tu propio `Navigator`. |
+| `BilleteraWidget.open` | Abre la pantalla con `Navigator.push`. |
+| `BilleteraWebViewScreen` | Misma UI dentro de tu propio `Navigator`. |
 | `buildBilleteraWidgetUri` | Obtener el `Uri` final (tests, logs). |
 | `parseWidgetBaseUri` | Normalizar solo la base. |
-| `homePath` en `BilleteraWidgetConfig` | Si la ruta no es `home` (por defecto `home`). |
+| `homePath` en `BilleteraWidgetConfig` | Si el segmento de ruta no es el predeterminado `home`. |
 
 ---
 
 ## 7. Variables por entorno (`--dart-define`)
 
-Podés inyectar la URL en tiempo de compilación y leerla con `String.fromEnvironment`:
+Podés inyectar la URL en tiempo de compilación y leerla con `String.fromEnvironment` (el nombre de la variable lo elegís vos en tu app):
 
 ```bash
-flutter run --dart-define=WIDGET_BASE_URL=https://staging-widget.ejemplo.com
+flutter run --dart-define=BILLETERA_BASE_URL=https://staging.midominio.com
 ```
 
 ```dart
-const base = String.fromEnvironment('WIDGET_BASE_URL', defaultValue: 'https://prod-widget.ejemplo.com');
+const base = String.fromEnvironment(
+  'BILLETERA_BASE_URL',
+  defaultValue: 'https://billetera.midominio.com',
+);
 ```
 
 Para builds:
 
 ```bash
-flutter build apk --dart-define=WIDGET_BASE_URL=https://…
+flutter build apk --dart-define=BILLETERA_BASE_URL=https://…
 ```
 
 ---
 
 ## 8. App de ejemplo
 
-Si tu equipo mantiene un proyecto demo aparte, usalo como referencia de `pubspec.yaml`, manifest iOS/Android y validación previa. La URL del repo depende de tu organización en GitHub.
+Si tu organización publica un proyecto demo de integración, usalo como referencia de `pubspec.yaml`, manifests iOS/Android y validación previa.
 
 ---
 
@@ -290,6 +296,8 @@ flutter pub get
 flutter test
 cd example && flutter run --dart-define=WIDGET_BASE_URL=http://127.0.0.1:4200
 ```
+
+*(En `example/` el nombre `WIDGET_BASE_URL` es solo del proyecto de ejemplo.)*
 
 ---
 
