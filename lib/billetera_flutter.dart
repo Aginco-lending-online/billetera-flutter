@@ -15,7 +15,7 @@ import 'src/billetera_widget_config.dart';
 /// ```dart
 /// await BilleteraWidget.open(
 ///   context,
-///   config: BilleteraWidgetConfig(baseUrl: 'https://tu-widget.example.com'),
+///   config: BilleteraWidgetConfig(baseUrl: 'https://billetera-widget.qa.lendrak.es'),
 ///   params: BilleteraLaunchParams(
 ///     dni: '12345678',
 ///     genero: BilleteraGenero.masculino,

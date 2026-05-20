@@ -15,20 +15,20 @@ class ExampleApp extends StatelessWidget {
         body: Center(
           child: FilledButton(
             onPressed: () async {
-              // Ajustá la URL al entorno (dev / staging / prod).
+              // QA por defecto; override: --dart-define=WIDGET_BASE_URL=http://10.0.2.2:4200
               const config = BilleteraWidgetConfig(
                 baseUrl: String.fromEnvironment(
                   'WIDGET_BASE_URL',
-                  defaultValue: 'http://10.0.2.2:4200',
+                  defaultValue: 'https://billetera-widget.qa.lendrak.es',
                 ),
                 debugLogging: true,
               );
               const params = BilleteraLaunchParams(
                 dni: '12345678',
                 genero: BilleteraGenero.masculino,
-                correo: 'demo@example.com',
-                celular: '1122334455',
-                tenant: 'demo-tenant',
+                correo: 'usuario@correo.com',
+                celular: '584120893949',
+                tenant: 'TU_TENANT_TOKEN',
               );
               await BilleteraWidget.open(
                 context,

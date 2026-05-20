@@ -27,6 +27,12 @@ class BilleteraWidgetConfig {
   /// Si es true, imprime la URL final en consola (solo depuración).
   final bool debugLogging;
 
+  /// Entorno QA desplegado (`billetera-widget.qa.lendrak.es`).
+  static const BilleteraWidgetConfig qa = BilleteraWidgetConfig(
+    baseUrl: 'https://billetera-widget.qa.lendrak.es',
+    debugLogging: kDebugMode,
+  );
+
   /// Desarrollo local típico (Angular `ng serve` en el host; emulador Android → 10.0.2.2).
   static const BilleteraWidgetConfig localAndroidEmulator =
       BilleteraWidgetConfig(

@@ -2,7 +2,7 @@
 
 Paquete Flutter para **embeber el flujo de billetera en un WebView**. Tu app solo necesita:
 
-- La **URL base** que te dé tu equipo (staging, producción o entorno local).
+- La **URL base** del widget (en QA: `https://billetera-widget.qa.lendrak.es`; ver [Entornos](#entornos)).
 - Los datos de persona: `dni`, `género`, `correo`, `celular`, `tenant`.
 
 El paquete construye la petición a la ruta `/home` con esos datos en el query string (equivalente a abrir una URL en el navegador).
@@ -16,26 +16,137 @@ El paquete construye la petición a la ruta `/home` con esos datos en el query s
 1. Agregá la dependencia `git` en `pubspec.yaml` → `flutter pub get`.
 2. En **Android**, permití tráfico HTTP si usás `http://` local (ver [Android](#android-manifest)).
 3. En **iOS**, configurá ATS para red local si usás `http://` (ver [iOS](#ios-infoplist)).
-4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo el origen** que te indiquen (sin `/home` ni `?query`).
+4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo el origen** (sin `/home` ni `?query`).
 
 ```dart
 import 'package:billetera_flutter/billetera_flutter.dart';
 
 await BilleteraWidget.open(
   context,
-  config: BilleteraWidgetConfig(
-    baseUrl: 'https://billetera.tu-dominio.com',
+  config: const BilleteraWidgetConfig(
+    baseUrl: 'https://billetera-widget.qa.lendrak.es',
     debugLogging: true,
   ),
-  params: BilleteraLaunchParams(
+  params: const BilleteraLaunchParams(
     dni: '12345678',
     genero: BilleteraGenero.masculino,
     correo: 'usuario@correo.com',
-    celular: '1122334455',
-    tenant: 'tu-tenant',
+    celular: '584120893949',
+    tenant: 'TU_TENANT_TOKEN',
   ),
 );
 ```
+
+---
+
+## Entornos
+
+| Entorno | `baseUrl` (solo origen, sin `/home` ni query) |
+|---------|-----------------------------------------------|
+| **QA** | `https://billetera-widget.qa.lendrak.es` |
+| Local (emulador Android → host) | `http://10.0.2.2:4200` |
+| Local (simulador iOS / mismo host) | `http://127.0.0.1:4200` |
+| Producción | La HTTPS que asigne tu equipo (aún no documentada aquí) |
+
+En **QA** el widget ya está en HTTPS: no hace falta `usesCleartextTraffic` ni excepciones ATS solo por cargar la URL de QA.
+
+---
+
+## Guía: implementar el WebView en tu app
+
+Esta sección es para el equipo que integra el paquete en una app Flutter existente.
+
+### Paso 1 — Dependencia
+
+Agregá `billetera_flutter` en `pubspec.yaml` (ver [§1 Instalar el paquete](#1-instalar-el-paquete)) y ejecutá `flutter pub get`.
+
+### Paso 2 — Permisos de red
+
+**Android** — en `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+```
+
+Solo necesitás `android:usesCleartextTraffic="true"` si probás contra `http://` local (ver [§2](#2-plataforma-http-local-http)).
+
+**iOS** — para QA/producción con HTTPS no suele hacer falta ATS extra. Para `http://` local, ver [§2](#2-plataforma-http-local-http).
+
+### Paso 3 — De la URL del navegador al código Flutter
+
+Si en el navegador (o te la pasan por Slack) ves una URL como esta de **QA**:
+
+```text
+https://billetera-widget.qa.lendrak.es/home?dni=12345678&genero=m&correo=usuario@correo.com&celular=584120893949&tenant=TU_TENANT_TOKEN
+```
+
+| Parte de la URL | Dónde va en Flutter |
+|-----------------|---------------------|
+| `https://billetera-widget.qa.lendrak.es` | `BilleteraWidgetConfig.baseUrl` |
+| `/home` | **No** lo pongas en `baseUrl`; el paquete lo agrega (`homePath` por defecto). |
+| `dni`, `genero`, `correo`, `celular`, `tenant` | `BilleteraLaunchParams` (campo a campo) |
+
+Ejemplo equivalente en código:
+
+```dart
+import 'package:billetera_flutter/billetera_flutter.dart';
+
+Future<void> abrirBilletera(BuildContext context) async {
+  const config = BilleteraWidgetConfig(
+    baseUrl: 'https://billetera-widget.qa.lendrak.es',
+    debugLogging: true, // imprime la URL final en consola
+  );
+  const params = BilleteraLaunchParams(
+    dni: '12345678',
+    genero: BilleteraGenero.masculino, // en la URL suele verse como genero=m
+    correo: 'usuario@correo.com',
+    celular: '584120893949',
+    tenant: 'TU_TENANT_TOKEN',
+  );
+
+  final urlErr = validateBilleteraBaseUrl(config.baseUrl);
+  final paramErr = params.validate();
+  if (urlErr != null || paramErr != null) {
+    // Mostrá el error al usuario antes de abrir el WebView
+    return;
+  }
+
+  await BilleteraWidget.open(context, config: config, params: params);
+}
+```
+
+Activá `debugLogging: true` y compará en consola:
+
+`[billetera_flutter] WebView URL: …`
+
+con la URL que abrís en Chrome/Safari (mismo host, mismos query).
+
+### Paso 4 — Dónde llamar `open`
+
+- Tras login o cuando ya tengas DNI, correo, celular y **tenant** (token de aplicación).
+- Desde un botón o al entrar a la sección “Billetera” de tu app.
+- Usá el `BuildContext` de un widget montado (por ejemplo dentro de `onPressed`).
+
+### Paso 5 — Errores frecuentes al integrar
+
+| Error | Causa | Solución |
+|-------|--------|----------|
+| Página en blanco en QA | `baseUrl` con `/home` o query mezclados | Solo origen: `https://billetera-widget.qa.lendrak.es` |
+| URL distinta al navegador | Parámetros armados a mano en la URL | Usá solo `BilleteraLaunchParams` |
+| `Tenant no puede estar vacío` | Token no cargado en la app | Obtené el tenant desde tu backend/config antes de abrir |
+| `genero` inválido | Valor fuera de M/F/O | `BilleteraGenero` o `'m'`/`'f'`/`'o'` |
+| Sin red en Android | Falta `INTERNET` | Agregar permiso en manifest |
+
+### Paso 6 — Probar sin escribir código nuevo
+
+Desde el repo del paquete:
+
+```bash
+cd example
+flutter run --dart-define=WIDGET_BASE_URL=https://billetera-widget.qa.lendrak.es
+```
+
+Ajustá `BilleteraLaunchParams` en `example/lib/main.dart` con datos de prueba válidos para tu tenant en QA.
 
 ---
 
@@ -136,19 +247,31 @@ El paquete **no** recibe la URL completa del navegador con `/home?dni=…`. Reci
 
 ### Ejemplo
 
-Si te pasan o copiás del navegador algo como:
+**QA** — si copiás del navegador:
 
 ```text
-http://localhost:4200/home?dni=12345678&genero=M&correo=a@b.com&celular=…&tenant=…
+https://billetera-widget.qa.lendrak.es/home?dni=12345678&genero=m&correo=…&celular=…&tenant=…
 ```
 
 En Flutter pasá **solo**:
 
 ```dart
-baseUrl: 'http://localhost:4200'
+baseUrl: 'https://billetera-widget.qa.lendrak.es'
 ```
 
-Los datos van en `BilleteraLaunchParams`, no en la URL manual.
+**Local** — si copiás algo como:
+
+```text
+http://localhost:4200/home?dni=12345678&genero=M&correo=a@b.com&celular=…&tenant=…
+```
+
+En Flutter:
+
+```dart
+baseUrl: 'http://localhost:4200'  // emulador Android: http://10.0.2.2:4200
+```
+
+Los datos van siempre en `BilleteraLaunchParams`, no en la URL manual.
 
 ### Qué incluye `baseUrl`
 
@@ -177,14 +300,13 @@ Si escribís solo host y puerto, se asume **HTTP**:
 
 ### Tabla por entorno
 
-Pedí a tu equipo la URL exacta para cada entorno. Referencias habituales cuando el servidor corre en **tu PC** y la app en un dispositivo:
-
-| Dónde corre la app | `baseUrl` típica hacia tu máquina |
-|--------------------|-----------------------------------|
-| Emulador Android | `http://10.0.2.2:PUERTO` (`10.0.2.2` es el alias del host desde el emulador) |
+| Entorno | `baseUrl` |
+|---------|-----------|
+| **QA (widget desplegado)** | `https://billetera-widget.qa.lendrak.es` |
+| Emulador Android → servidor en tu PC | `http://10.0.2.2:PUERTO` (`10.0.2.2` es el alias del host desde el emulador) |
 | Simulador iOS / macOS / mismo host | `http://127.0.0.1:PUERTO` o `http://localhost:PUERTO` |
 | Dispositivo físico (misma WiFi) | `http://IP_DE_TU_PC:PUERTO` |
-| Staging / producción | La HTTPS que te asignen (ej. `https://billetera.midominio.com`) |
+| Producción | La HTTPS que asigne tu equipo |
 
 **Emulador Android y servidor solo en `127.0.0.1`:** desde el emulador no sirve usar `http://localhost:4200` para llegar a tu PC; usá `10.0.2.2`. Además, el proceso que escucha en tu máquina debe aceptar conexiones **desde la red del emulador** (no solo loopback). Si no carga, pedí a tu equipo que el servidor de desarrollo escuche en **todas las interfaces** (`0.0.0.0`) o que te den la URL correcta para ese entorno.
 
@@ -263,13 +385,13 @@ La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. C
 Podés inyectar la URL en tiempo de compilación y leerla con `String.fromEnvironment` (el nombre de la variable lo elegís vos en tu app):
 
 ```bash
-flutter run --dart-define=BILLETERA_BASE_URL=https://staging.midominio.com
+flutter run --dart-define=BILLETERA_BASE_URL=https://billetera-widget.qa.lendrak.es
 ```
 
 ```dart
 const base = String.fromEnvironment(
   'BILLETERA_BASE_URL',
-  defaultValue: 'https://billetera.midominio.com',
+  defaultValue: 'https://billetera-widget.qa.lendrak.es',
 );
 ```
 
@@ -283,7 +405,9 @@ flutter build apk --dart-define=BILLETERA_BASE_URL=https://…
 
 ## 8. App de ejemplo
 
-Si tu organización publica un proyecto demo de integración, usalo como referencia de `pubspec.yaml`, manifests iOS/Android y validación previa.
+En `example/` hay una app mínima con `BilleteraWidget.open`. Por defecto apunta a **QA**; podés cambiar la URL con `--dart-define=WIDGET_BASE_URL=…`.
+
+Ver [example/README.md](example/README.md).
 
 ---
 
