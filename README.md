@@ -3,11 +3,11 @@
 Paquete Flutter para **embeber el flujo de billetera en un WebView**. Tu app solo necesita:
 
 - La **URL base** del widget (en QA: `https://billetera-widget.qa.lendrak.es`; ver [Entornos](#entornos)).
-- Los datos de persona: `dni`, `género`, `correo`, `celular`, `tenant`.
+- El **DNI** de la persona. Todo lo demás (`genero`, `correo`, `celular`, `tenant`, `idEntidad`) es **opcional**: ver [Parámetros](#parámetros).
 
 El paquete construye la petición a la ruta `/home` con esos datos en el query string (equivalente a abrir una URL en el navegador).
 
-**Requisitos:** Dart `>=3.2.0`, Flutter `>=3.16.0`.
+**Requisitos:** Dart `>=3.5.0`, Flutter `>=3.24.0`.
 
 ---
 
@@ -29,12 +29,21 @@ await BilleteraWidget.open(
   ),
   params: const BilleteraLaunchParams(
     dni: '12345678',
-    genero: BilleteraGenero.masculino,
-    correo: 'usuario@correo.com',
-    celular: '584120893949',
     tenant: 'TU_TENANT_TOKEN',
   ),
 );
+```
+
+Si tu app ya conoce más datos de la persona, pasalos y el widget los usa como precarga:
+
+```dart
+params: const BilleteraLaunchParams(
+  dni: '12345678',
+  genero: BilleteraGenero.masculino,
+  correo: 'usuario@correo.com',
+  celular: '584120893949',
+  tenant: 'TU_TENANT_TOKEN',
+),
 ```
 
 ---
@@ -84,7 +93,7 @@ https://billetera-widget.qa.lendrak.es/home?dni=12345678&genero=m&correo=usuario
 |-----------------|---------------------|
 | `https://billetera-widget.qa.lendrak.es` | `BilleteraWidgetConfig.baseUrl` |
 | `/home` | **No** lo pongas en `baseUrl`; el paquete lo agrega (`homePath` por defecto). |
-| `dni`, `genero`, `correo`, `celular`, `tenant` | `BilleteraLaunchParams` (campo a campo) |
+| `dni`, `genero`, `correo`, `celular`, `tenant`, `idEntidad` | `BilleteraLaunchParams` (campo a campo). Los que no tengas, omitilos. |
 
 Ejemplo equivalente en código:
 
@@ -121,23 +130,50 @@ Activá `debugLogging: true` y compará en consola:
 
 con la URL que abrís en Chrome/Safari (mismo host, mismos query).
 
+### Parámetros
+
+El paquete acepta **exactamente los mismos parámetros que el widget**, con las mismas reglas: solo el DNI es obligatorio.
+
+| Parámetro | ¿Obligatorio? | Para qué sirve |
+|-----------|---------------|----------------|
+| `dni` | **Sí** | Identifica a la persona. Sin él, el widget no deja arrancar la solicitud. |
+| `tenant` | No, pero recomendado | Token de aplicación. Con él, el middleware sabe contra qué núcleo de préstamos hablar; sin él, usa su configuración de entorno. **Mandalo siempre en producción.** |
+| `genero` | No | Precarga. `BilleteraGenero`, letra `M`/`F`/`O`, o texto `Masculino`/`Femenino`/`Otro`. |
+| `correo` | No | Precarga del formulario de datos. |
+| `celular` | No | Precarga del formulario de datos. |
+| `idEntidad` | No | Entidad de tu app dentro de la operación. |
+
+**Los campos que no mandes, el widget se los pide al usuario** en la pantalla de datos adicionales; los que sí mandes vienen precargados y siguen siendo editables. Si tu app todavía no tiene el correo o el celular de la persona, no los pases: no hace falta inventar valores para poder abrir el flujo.
+
+Un valor vacío o solo con espacios se trata como ausente y no llega a la URL.
+
+Sobre `idEntidad`: queda como `…&idEntidad=ENT-9911` en la URL y el widget lo reenvía al middleware en cada llamada mediante la cabecera `X-Entity-Id`.
+
+> **Estado actual de `idEntidad`:** el backend lo recibe y lo registra, pero todavía no lo usa para ninguna decisión de negocio. No afecta ofertas, evaluación de riesgo ni alta del préstamo. Podés empezar a enviarlo desde ya para no tener que actualizar la app cuando se le dé uso.
+
 ### Paso 4 — Dónde llamar `open`
 
-- Tras login o cuando ya tengas DNI, correo, celular y **tenant** (token de aplicación).
+- Tras login o apenas tengas el **DNI** de la persona (y el **tenant**, si tu app lo maneja).
 - Desde un botón o al entrar a la sección “Billetera” de tu app.
 - Usá el `BuildContext` de un widget montado (por ejemplo dentro de `onPressed`).
 
-### Paso 5 — Errores frecuentes al integrar
+### Paso 5 — Botón atrás
+
+El flujo son varias pantallas **dentro** del WebView. El paquete ya intercepta el botón atrás del teléfono: retrocede en el historial del widget y solo cierra la pantalla cuando ya no hay a dónde volver. No tenés que hacer nada.
+
+Si embebés `BilleteraWebViewScreen` por tu cuenta en vez de usar `BilleteraWidget.open`, ese comportamiento viene incluido igual.
+
+### Paso 6 — Errores frecuentes al integrar
 
 | Error | Causa | Solución |
 |-------|--------|----------|
 | Página en blanco en QA | `baseUrl` con `/home` o query mezclados | Solo origen: `https://billetera-widget.qa.lendrak.es` |
 | URL distinta al navegador | Parámetros armados a mano en la URL | Usá solo `BilleteraLaunchParams` |
-| `Tenant no puede estar vacío` | Token no cargado en la app | Obtené el tenant desde tu backend/config antes de abrir |
-| `genero` inválido | Valor fuera de M/F/O | `BilleteraGenero` o `'m'`/`'f'`/`'o'` |
+| El widget no encuentra el tenant | Token no cargado en la app | Obtené el tenant desde tu backend/config antes de abrir |
+| `genero` inválido | Valor fuera de M/F/O | `BilleteraGenero` o `'m'`/`'f'`/`'o'`, o no lo mandes |
 | Sin red en Android | Falta `INTERNET` | Agregar permiso en manifest |
 
-### Paso 6 — Probar sin escribir código nuevo
+### Paso 7 — Probar sin escribir código nuevo
 
 Desde el repo del paquete:
 
@@ -243,7 +279,9 @@ Más opciones en la [documentación de Apple sobre ATS](https://developer.apple.
 
 El paquete **no** recibe la URL completa del navegador con `/home?dni=…`. Recibe el **origen** (protocolo + host + puerto opcional + path opcional de despliegue) y arma internamente:
 
-`{baseUrl normalizado}/home?dni=…&genero=…&correo=…&celular=…&tenant=…`
+`{baseUrl normalizado}/home?dni=…&genero=…&correo=…&celular=…&tenant=…&idEntidad=…`
+
+En la URL solo aparecen los parámetros que hayas mandado con contenido, siempre en ese orden. Con solo el DNI, la URL final es `{baseUrl}/home?dni=12345678`.
 
 ### Ejemplo
 
@@ -324,13 +362,14 @@ Si escribís solo host y puerto, se asume **HTTP**:
 
 ### Parámetros (`BilleteraLaunchParams.validate()`)
 
+Los campos opcionales **solo se validan cuando los mandás con contenido**: que falten no es un error.
+
 | Problema | Mensaje |
 |----------|---------|
-| DNI | `DNI debe tener entre 7 y 8 dígitos` |
+| DNI ausente o mal formado | `DNI debe tener entre 7 y 8 dígitos` |
 | Género no reconocido | Depende del valor; usá `M`/`F`/`O` o `BilleteraGenero` |
-| Correo | `Correo electrónico no válido` |
-| Celular | `Celular no válido (mínimo 8 dígitos en total)` |
-| Tenant vacío | `Tenant no puede estar vacío` |
+| Correo con formato inválido | `Correo electrónico no válido` |
+| Celular demasiado corto | `Celular no válido (mínimo 8 dígitos en total)` |
 
 ### Validar antes de abrir (tu app)
 
@@ -373,10 +412,12 @@ La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. C
 | API | Uso |
 |-----|-----|
 | `BilleteraWidget.open` | Abre la pantalla con `Navigator.push`. |
-| `BilleteraWebViewScreen` | Misma UI dentro de tu propio `Navigator`. |
+| `BilleteraWebViewScreen` | Misma UI para embeber donde quieras (pestaña, `IndexedStack`, tu propio `Navigator`). |
 | `buildBilleteraWidgetUri` | Obtener el `Uri` final (tests, logs). |
 | `parseWidgetBaseUri` | Normalizar solo la base. |
 | `homePath` en `BilleteraWidgetConfig` | Si el segmento de ruta no es el predeterminado `home`. |
+| `showAppBar` en `BilleteraWidgetConfig` | `false` para ocultar el `AppBar` del paquete. El widget ya trae su propio encabezado, así que evita la doble barra. |
+| `appBarTitle` en `BilleteraWidgetConfig` | Título del `AppBar` cuando sí lo mostrás. |
 
 ---
 

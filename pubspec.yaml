@@ -1,13 +1,15 @@
 name: billetera_flutter
 description: >
-  Paquete Flutter para abrir billetera-widget en un WebView con los datos de
-  persona (DNI, género, correo, celular, tenant). URL base configurable por entorno.
-version: 0.1.0
+  SDK Flutter para abrir billetera-widget en un WebView. Solo el DNI es
+  obligatorio; género, correo, celular, tenant e idEntidad son opcionales.
+  URL base configurable por entorno.
+version: 0.2.0
 publish_to: none
 
 environment:
-  sdk: ">=3.2.0 <4.0.0"
-  flutter: ">=3.16.0"
+  # PopScope.onPopInvokedWithResult, usado para el botón atrás, requiere 3.24.
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
 
 dependencies:
   flutter:

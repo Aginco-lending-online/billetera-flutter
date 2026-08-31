@@ -6,6 +6,9 @@ import 'billetera_url_builder.dart';
 import 'billetera_widget_config.dart';
 
 /// Pantalla con [WebView] que carga billetera-widget en `/home` con query params.
+///
+/// Se puede usar suelta (por ejemplo dentro de un `IndexedStack` o una pestaña)
+/// o a traves de `BilleteraWidget.open`, que la empuja como ruta.
 class BilleteraWebViewScreen extends StatefulWidget {
   const BilleteraWebViewScreen({
     super.key,
@@ -67,74 +70,96 @@ class _BilleteraWebViewScreenState extends State<BilleteraWebViewScreen> {
     _controller = controller;
   }
 
+  /// El flujo son varias pantallas dentro del WebView: el boton atras del
+  /// telefono tiene que retroceder ahi y recien cerrar cuando no hay a donde
+  /// volver. Sin esto, el primer atras abandona toda la solicitud.
+  Future<void> _handlePop(bool didPop) async {
+    if (didPop) return;
+    final controller = _controller;
+    if (controller != null && await controller.canGoBack()) {
+      await controller.goBack();
+      return;
+    }
+    // pop y no maybePop: maybePop volveria a consultar este mismo PopScope,
+    // que sigue diciendo canPop=false, y el atras nunca cerraria la pantalla.
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = widget.config.appBarTitle;
+    final showError = _paramsError != null;
 
-    if (_paramsError != null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              _paramsError!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
+    return PopScope(
+      // Con la pantalla de error no hay historial que recorrer: se cierra directo.
+      canPop: showError,
+      onPopInvokedWithResult: (didPop, _) => _handlePop(didPop),
+      child: Scaffold(
+        appBar: widget.config.showAppBar
+            ? AppBar(title: Text(widget.config.appBarTitle))
+            : null,
+        body: SafeArea(
+          child: showError ? _buildParamsError(context) : _buildWebView(),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          WebViewWidget(controller: _controller!),
-          if (_loading)
-            const ColoredBox(
-              color: Color(0x66FFFFFF),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          if (_pageError != null)
-            Material(
-              color: Colors.black54,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: Card(
-                    margin: const EdgeInsets.all(24),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _pageError!,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: () {
-                              setState(() {
-                                _pageError = null;
-                                _loading = true;
-                              });
-                              _controller?.reload();
-                            },
-                            child: const Text('Reintentar'),
-                          ),
-                        ],
-                      ),
+  Widget _buildParamsError(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          _paramsError!,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebView() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        WebViewWidget(controller: _controller!),
+        if (_loading)
+          const ColoredBox(
+            color: Color(0x66FFFFFF),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (_pageError != null)
+          Material(
+            color: Colors.black54,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Card(
+                  margin: const EdgeInsets.all(24),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_pageError!, textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              _pageError = null;
+                              _loading = true;
+                            });
+                            _controller?.reload();
+                          },
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

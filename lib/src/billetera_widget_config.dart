@@ -13,6 +13,7 @@ class BilleteraWidgetConfig {
     required this.baseUrl,
     this.homePath = 'home',
     this.appBarTitle = 'Billetera',
+    this.showAppBar = true,
     this.debugLogging = false,
   });
 
@@ -23,6 +24,10 @@ class BilleteraWidgetConfig {
   final String homePath;
 
   final String appBarTitle;
+
+  /// El widget ya dibuja su propio encabezado con el título de cada pantalla.
+  /// Poné `false` para no duplicar barras y dejar el WebView a pantalla completa.
+  final bool showAppBar;
 
   /// Si es true, imprime la URL final en consola (solo depuración).
   final bool debugLogging;
