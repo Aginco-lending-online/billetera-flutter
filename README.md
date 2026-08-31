@@ -468,4 +468,6 @@ cd example && flutter run --dart-define=WIDGET_BASE_URL=http://127.0.0.1:4200
 
 ## Licencia
 
-La que defina quien distribuya el paquete.
+Apache License 2.0 — ver [LICENSE](LICENSE).
+
+Copyright 2026 AgilTech.

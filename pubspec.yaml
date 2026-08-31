@@ -7,6 +7,9 @@ description: >
 version: 0.2.1
 publish_to: none
 
+repository: https://github.com/Aginco-lending-online/billetera-flutter
+issue_tracker: https://github.com/Aginco-lending-online/billetera-flutter/issues
+
 environment:
   # PopScope.onPopInvokedWithResult, usado para el botón atrás, requiere 3.24.
   sdk: ">=3.5.0 <4.0.0"
