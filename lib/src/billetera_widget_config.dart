@@ -32,9 +32,9 @@ class BilleteraWidgetConfig {
   /// Si es true, imprime la URL final en consola (solo depuración).
   final bool debugLogging;
 
-  /// Entorno QA desplegado (`billetera-widget.qa.lendrak.es`).
-  static const BilleteraWidgetConfig qa = BilleteraWidgetConfig(
-    baseUrl: 'https://billetera-widget.qa.lendrak.es',
+  /// Entorno staging desplegado (`staging.agiltech.io/billetera-widget`).
+  static const BilleteraWidgetConfig staging = BilleteraWidgetConfig(
+    baseUrl: 'https://staging.agiltech.io/billetera-widget',
     debugLogging: kDebugMode,
   );
 

@@ -2,8 +2,8 @@
 
 Paquete Flutter para **embeber el flujo de billetera en un WebView**. Tu app solo necesita:
 
-- La **URL base** del widget (en QA: `https://billetera-widget.qa.lendrak.es`; ver [Entornos](#entornos)).
-- El **DNI** de la persona. Todo lo demás (`genero`, `correo`, `celular`, `tenant`, `idEntidad`) es **opcional**: ver [Parámetros](#parámetros).
+- La **URL base** del widget (en staging: `https://staging.agiltech.io/billetera-widget`; ver [Entornos](#entornos)).
+- El **DNI** de la persona y el **tenant** de tu app: el paquete solo exige el DNI, pero sin `tenant` el middleware no deja crear la solicitud. `genero`, `correo`, `celular` e `idEntidad` sí son **opcionales**: ver [Parámetros](#parámetros).
 
 El paquete construye la petición a la ruta `/home` con esos datos en el query string (equivalente a abrir una URL en el navegador).
 
@@ -16,7 +16,7 @@ El paquete construye la petición a la ruta `/home` con esos datos en el query s
 1. Agregá la dependencia `git` en `pubspec.yaml` → `flutter pub get`.
 2. En **Android**, permití tráfico HTTP si usás `http://` local (ver [Android](#android-manifest)).
 3. En **iOS**, configurá ATS para red local si usás `http://` (ver [iOS](#ios-infoplist)).
-4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = solo el origen** (sin `/home` ni `?query`).
+4. Llamá `BilleteraWidget.open(context, config: …, params: …)` con **`baseUrl` = el origen con el subpath donde esté montado el widget** (sin `/home` ni `?query`).
 
 ```dart
 import 'package:billetera_flutter/billetera_flutter.dart';
@@ -24,7 +24,7 @@ import 'package:billetera_flutter/billetera_flutter.dart';
 await BilleteraWidget.open(
   context,
   config: const BilleteraWidgetConfig(
-    baseUrl: 'https://billetera-widget.qa.lendrak.es',
+    baseUrl: 'https://staging.agiltech.io/billetera-widget',
     debugLogging: true,
   ),
   params: const BilleteraLaunchParams(
@@ -50,14 +50,14 @@ params: const BilleteraLaunchParams(
 
 ## Entornos
 
-| Entorno | `baseUrl` (solo origen, sin `/home` ni query) |
+| Entorno | `baseUrl` (sin `/home` ni query) |
 |---------|-----------------------------------------------|
-| **QA** | `https://billetera-widget.qa.lendrak.es` |
+| **Staging** | `https://staging.agiltech.io/billetera-widget` |
 | Local (emulador Android → host) | `http://10.0.2.2:4200` |
 | Local (simulador iOS / mismo host) | `http://127.0.0.1:4200` |
 | Producción | La HTTPS que asigne tu equipo (aún no documentada aquí) |
 
-En **QA** el widget ya está en HTTPS: no hace falta `usesCleartextTraffic` ni excepciones ATS solo por cargar la URL de QA.
+En **staging** el widget ya está en HTTPS: no hace falta `usesCleartextTraffic` ni excepciones ATS solo por cargar la URL de staging.
 
 ---
 
@@ -79,21 +79,21 @@ Agregá `billetera_flutter` en `pubspec.yaml` (ver [§1 Instalar el paquete](#1-
 
 Solo necesitás `android:usesCleartextTraffic="true"` si probás contra `http://` local (ver [§2](#2-plataforma-http-local-http)).
 
-**iOS** — para QA/producción con HTTPS no suele hacer falta ATS extra. Para `http://` local, ver [§2](#2-plataforma-http-local-http).
+**iOS** — para staging/producción con HTTPS no suele hacer falta ATS extra. Para `http://` local, ver [§2](#2-plataforma-http-local-http).
 
 ### Paso 3 — De la URL del navegador al código Flutter
 
-Si en el navegador (o te la pasan por Slack) ves una URL como esta de **QA**:
+Si en el navegador (o te la pasan por Slack) ves una URL como esta de **staging**:
 
 ```text
-https://billetera-widget.qa.lendrak.es/home?dni=12345678&genero=m&correo=usuario@correo.com&celular=584120893949&tenant=TU_TENANT_TOKEN
+https://staging.agiltech.io/billetera-widget/home?dni=12345678&genero=m&correo=usuario@correo.com&celular=584120893949&tenant=TU_TENANT_TOKEN
 ```
 
 | Parte de la URL | Dónde va en Flutter |
 |-----------------|---------------------|
-| `https://billetera-widget.qa.lendrak.es` | `BilleteraWidgetConfig.baseUrl` |
+| `https://staging.agiltech.io/billetera-widget` | `BilleteraWidgetConfig.baseUrl` |
 | `/home` | **No** lo pongas en `baseUrl`; el paquete lo agrega (`homePath` por defecto). |
-| `dni`, `genero`, `correo`, `celular`, `tenant`, `idEntidad` | `BilleteraLaunchParams` (campo a campo). Los que no tengas, omitilos. |
+| `dni`, `genero`, `correo`, `celular`, `tenant`, `idEntidad` | `BilleteraLaunchParams` (campo a campo). Los opcionales que no tengas, omitilos; el `tenant` no es uno de ellos. |
 
 Ejemplo equivalente en código:
 
@@ -102,7 +102,7 @@ import 'package:billetera_flutter/billetera_flutter.dart';
 
 Future<void> abrirBilletera(BuildContext context) async {
   const config = BilleteraWidgetConfig(
-    baseUrl: 'https://billetera-widget.qa.lendrak.es',
+    baseUrl: 'https://staging.agiltech.io/billetera-widget',
     debugLogging: true, // imprime la URL final en consola
   );
   const params = BilleteraLaunchParams(
@@ -132,12 +132,12 @@ con la URL que abrís en Chrome/Safari (mismo host, mismos query).
 
 ### Parámetros
 
-El paquete acepta **exactamente los mismos parámetros que el widget**, con las mismas reglas: solo el DNI es obligatorio.
+El paquete acepta **exactamente los mismos parámetros que el widget**. Valida solo el DNI, pero eso no alcanza para completar el flujo: sin `tenant` el middleware rechaza la creación de la solicitud.
 
 | Parámetro | ¿Obligatorio? | Para qué sirve |
 |-----------|---------------|----------------|
 | `dni` | **Sí** | Identifica a la persona. Sin él, el widget no deja arrancar la solicitud. |
-| `tenant` | No, pero recomendado | Token de aplicación. Con él, el middleware sabe contra qué núcleo de préstamos hablar; sin él, usa su configuración de entorno. **Mandalo siempre en producción.** |
+| `tenant` | **Sí, en la práctica** | Token de aplicación. Con él el middleware sabe contra qué núcleo de préstamos hablar y aplica el límite de solicitudes del comercio. El paquete no lo exige y el flujo se abre igual, pero al crear la solicitud el middleware la rechaza con `Falta el tenant (appToken)`. **Mandalo siempre.** |
 | `genero` | No | Precarga. `BilleteraGenero`, letra `M`/`F`/`O`, o texto `Masculino`/`Femenino`/`Otro`. |
 | `correo` | No | Precarga del formulario de datos. |
 | `celular` | No | Precarga del formulario de datos. |
@@ -153,7 +153,7 @@ Sobre `idEntidad`: queda como `…&idEntidad=ENT-9911` en la URL y el widget lo 
 
 ### Paso 4 — Dónde llamar `open`
 
-- Tras login o apenas tengas el **DNI** de la persona (y el **tenant**, si tu app lo maneja).
+- Tras login o apenas tengas el **DNI** de la persona. El **tenant** tiene que estar resuelto antes de abrir el flujo, no después.
 - Desde un botón o al entrar a la sección “Billetera” de tu app.
 - Usá el `BuildContext` de un widget montado (por ejemplo dentro de `onPressed`).
 
@@ -167,9 +167,9 @@ Si embebés `BilleteraWebViewScreen` por tu cuenta en vez de usar `BilleteraWidg
 
 | Error | Causa | Solución |
 |-------|--------|----------|
-| Página en blanco en QA | `baseUrl` con `/home` o query mezclados | Solo origen: `https://billetera-widget.qa.lendrak.es` |
+| Página en blanco | `baseUrl` con `/home` o query mezclados | Sin `/home` ni query: `https://staging.agiltech.io/billetera-widget` |
 | URL distinta al navegador | Parámetros armados a mano en la URL | Usá solo `BilleteraLaunchParams` |
-| El widget no encuentra el tenant | Token no cargado en la app | Obtené el tenant desde tu backend/config antes de abrir |
+| La solicitud falla al crearse (`Falta el tenant`) | Se abrió el flujo sin `tenant` | Resolvelo antes de abrir: el paquete no lo valida, el middleware sí |
 | `genero` inválido | Valor fuera de M/F/O | `BilleteraGenero` o `'m'`/`'f'`/`'o'`, o no lo mandes |
 | Sin red en Android | Falta `INTERNET` | Agregar permiso en manifest |
 
@@ -179,10 +179,10 @@ Desde el repo del paquete:
 
 ```bash
 cd example
-flutter run --dart-define=WIDGET_BASE_URL=https://billetera-widget.qa.lendrak.es
+flutter run --dart-define=WIDGET_BASE_URL=https://staging.agiltech.io/billetera-widget
 ```
 
-Ajustá `BilleteraLaunchParams` en `example/lib/main.dart` con datos de prueba válidos para tu tenant en QA.
+Ajustá `BilleteraLaunchParams` en `example/lib/main.dart` con datos de prueba válidos para tu tenant en staging.
 
 ---
 
@@ -285,16 +285,16 @@ En la URL solo aparecen los parámetros que hayas mandado con contenido, siempre
 
 ### Ejemplo
 
-**QA** — si copiás del navegador:
+**Staging** — si copiás del navegador:
 
 ```text
-https://billetera-widget.qa.lendrak.es/home?dni=12345678&genero=m&correo=…&celular=…&tenant=…
+https://staging.agiltech.io/billetera-widget/home?dni=12345678&genero=m&correo=…&celular=…&tenant=…
 ```
 
 En Flutter pasá **solo**:
 
 ```dart
-baseUrl: 'https://billetera-widget.qa.lendrak.es'
+baseUrl: 'https://staging.agiltech.io/billetera-widget'
 ```
 
 **Local** — si copiás algo como:
@@ -340,7 +340,7 @@ Si escribís solo host y puerto, se asume **HTTP**:
 
 | Entorno | `baseUrl` |
 |---------|-----------|
-| **QA (widget desplegado)** | `https://billetera-widget.qa.lendrak.es` |
+| **Staging (widget desplegado)** | `https://staging.agiltech.io/billetera-widget` |
 | Emulador Android → servidor en tu PC | `http://10.0.2.2:PUERTO` (`10.0.2.2` es el alias del host desde el emulador) |
 | Simulador iOS / macOS / mismo host | `http://127.0.0.1:PUERTO` o `http://localhost:PUERTO` |
 | Dispositivo físico (misma WiFi) | `http://IP_DE_TU_PC:PUERTO` |
@@ -426,13 +426,13 @@ La pantalla del paquete puede mostrar error de red y un botón **Reintentar**. C
 Podés inyectar la URL en tiempo de compilación y leerla con `String.fromEnvironment` (el nombre de la variable lo elegís vos en tu app):
 
 ```bash
-flutter run --dart-define=BILLETERA_BASE_URL=https://billetera-widget.qa.lendrak.es
+flutter run --dart-define=BILLETERA_BASE_URL=https://staging.agiltech.io/billetera-widget
 ```
 
 ```dart
 const base = String.fromEnvironment(
   'BILLETERA_BASE_URL',
-  defaultValue: 'https://billetera-widget.qa.lendrak.es',
+  defaultValue: 'https://staging.agiltech.io/billetera-widget',
 );
 ```
 
@@ -446,7 +446,7 @@ flutter build apk --dart-define=BILLETERA_BASE_URL=https://…
 
 ## 8. App de ejemplo
 
-En `example/` hay una app mínima con `BilleteraWidget.open`. Por defecto apunta a **QA**; podés cambiar la URL con `--dart-define=WIDGET_BASE_URL=…`.
+En `example/` hay una app mínima con `BilleteraWidget.open`. Por defecto apunta a **staging**; podés cambiar la URL con `--dart-define=WIDGET_BASE_URL=…`.
 
 Ver [example/README.md](example/README.md).
 

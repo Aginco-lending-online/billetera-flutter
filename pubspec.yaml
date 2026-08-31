@@ -1,9 +1,10 @@
 name: billetera_flutter
 description: >
-  SDK Flutter para abrir billetera-widget en un WebView. Solo el DNI es
-  obligatorio; género, correo, celular, tenant e idEntidad son opcionales.
-  URL base configurable por entorno.
-version: 0.2.0
+  Paquete Flutter de integración para abrir billetera-widget en un WebView.
+  El DNI es obligatorio y el tenant es imprescindible para crear la solicitud;
+  género, correo, celular e idEntidad son opcionales. URL base configurable
+  por entorno.
+version: 0.2.1
 publish_to: none
 
 environment:

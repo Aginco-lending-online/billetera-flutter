@@ -2,10 +2,12 @@ import 'billetera_genero.dart';
 
 /// Datos con los que la app host precarga billetera-widget en `/home`.
 ///
-/// Solo [dni] es obligatorio, igual que en el widget: es el unico dato sin el
-/// cual el flujo no puede arrancar. El resto son precargas que el usuario puede
-/// completar o corregir dentro del flujo, asi que si tu app no los tiene,
-/// simplemente no los mandes. Los campos vacios se omiten de la URL.
+/// Solo [dni] es obligatorio para abrir el flujo: es el unico dato sin el cual
+/// el widget no arranca. [tenant] no se valida aca, pero el middleware rechaza
+/// la creacion de la solicitud sin el, asi que en la practica va siempre. El
+/// resto son precargas que el usuario puede completar o corregir dentro del
+/// flujo, asi que si tu app no los tiene, simplemente no los mandes. Los campos
+/// vacios se omiten de la URL.
 class BilleteraLaunchParams {
   const BilleteraLaunchParams({
     required this.dni,
@@ -26,8 +28,9 @@ class BilleteraLaunchParams {
   /// Numero local o con prefijo 54 (se normaliza en el widget).
   final String? celular;
 
-  /// Token de aplicacion / tenant. Sin el, el middleware resuelve con su
-  /// configuracion de entorno; en produccion conviene mandarlo siempre.
+  /// Token de aplicacion / tenant. Este validate no lo exige y el flujo abre
+  /// igual, pero el middleware rechaza la creacion de la solicitud sin el:
+  /// mandalo siempre.
   final String? tenant;
 
   /// Entidad de la app host. El widget la reenvia al middleware, que hoy solo

@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const ExampleApp());
 
-// QA por defecto; override: --dart-define=WIDGET_BASE_URL=http://10.0.2.2:4200
+// Staging por defecto; override: --dart-define=WIDGET_BASE_URL=http://10.0.2.2:4200
 const _config = BilleteraWidgetConfig(
   baseUrl: String.fromEnvironment(
     'WIDGET_BASE_URL',
-    defaultValue: 'https://billetera-widget.qa.lendrak.es',
+    defaultValue: 'https://staging.agiltech.io/billetera-widget',
   ),
   debugLogging: true,
 );

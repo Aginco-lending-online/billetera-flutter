@@ -2,19 +2,19 @@
 
 App mínima que abre el widget en un WebView vía `BilleteraWidget.open`.
 
-## QA (recomendado para probar integración)
+## Staging (recomendado para probar integración)
 
 ```bash
-flutter run --dart-define=WIDGET_BASE_URL=https://billetera-widget.qa.lendrak.es
+flutter run --dart-define=WIDGET_BASE_URL=https://staging.agiltech.io/billetera-widget
 ```
 
-La URL del navegador en QA tiene esta forma:
+La URL del navegador en staging tiene esta forma:
 
 ```text
-https://billetera-widget.qa.lendrak.es/home?dni=…&genero=m&correo=…&celular=…&tenant=…
+https://staging.agiltech.io/billetera-widget/home?dni=…&genero=m&correo=…&celular=…&tenant=…
 ```
 
-En Flutter solo pasás el origen (`https://billetera-widget.qa.lendrak.es`); el resto va en `BilleteraLaunchParams` en `lib/main.dart`.
+En Flutter solo pasás la base (`https://staging.agiltech.io/billetera-widget`); el resto va en `BilleteraLaunchParams` en `lib/main.dart`.
 
 ## Local (widget en tu máquina)
 
